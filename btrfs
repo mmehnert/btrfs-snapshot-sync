@@ -1,0 +1,87 @@
+#!/usr/bin/python
+'''
+Created on 4 Sep 2012
+
+@author: Maximilian Mehnert <maximilian.mehnert@gmx.de>
+'''
+
+import subprocess
+import datetime
+import signal
+import time
+import pprint
+pp = pprint.PrettyPrinter(indent=2)
+
+class Subvolume:
+#	name=""
+	def __init__(self,name):
+		self.name=name
+		self.s_id=[]
+		self.s_level=[]
+		self.s_uuid=[]
+		self.s_parent_uuid=[]
+		self.s_received_uuid=[]
+		self.s_path=[]
+	def __str__(self):
+		return pp.pformat([self.name,self.s_uuid,self.s_parent_uuid,self.s_received_uuid,self.s_path])
+	def addSnapshot(self,sid,level,uuid,parent_uuid,received_uuid,path):
+		self.s_id.append(sid)
+		self.s_level.append(level)
+		self.s_uuid.append(uuid)
+		self.s_parent_uuid.append(parent_uuid)
+		self.s_received_uuid.append(received_uuid)
+		self.s_path.append(path)
+	def addSnapshot(self,snapshot):
+		self.s_id.append(snapshot[0])
+		self.s_level.append(snapshot[1])
+		self.s_uuid.append(snapshot[2])
+		self.s_parent_uuid.append(snapshot[3])
+		self.s_received_uuid.append(snapshot[4])
+		self.s_path.append(snapshot[5])
+	def get_last_common_snapshot(self,dst_vol=None):
+		for dst_snapshot in reversed(dst_vol.s_path):
+			for src_snapshot in reversed(self.s_path):
+				if dst_snapshot.split('@')[1] == src_snapshot.split('@')[1]:
+					return src_snapshot
+		return None
+
+
+
+od={"sid":1,"level":6,"parent_uuid":8,"received_uuid":10,"uuid":12,"path":14}
+sd={"sid":0,"level":1,"parent_uuid":2,"received_uuid":3,"uuid":4,"path":5}
+snapshots={}
+command="btrfs subvolume list -R -u -q  --sort=gen ."
+snapshot_list=subprocess.check_output(command, shell=True,universal_newlines=True).split("\n")
+for line in snapshot_list:
+		parts=line.split(" ",14)
+#		print(len(parts))
+#		pp.pprint(parts)
+		if len(parts)==15:
+			data=list( parts[i] for i in [od["sid"],od["level"],od["parent_uuid"],od["received_uuid"],od["uuid"],od["path"]] )
+#			pp.pprint(data)
+			if parts[od["parent_uuid"]] in snapshots:
+				snapshots[parts[od["parent_uuid"]]].append(data)
+			else:
+				snapshots[parts[od["parent_uuid"]]]=[data]
+#pp.pprint(snapshots)
+
+def walk_snapshots(Subvolumes,snapshots,puid,indent=0):
+	if puid in snapshots:
+		for snapshot in snapshots[puid]:
+#			pp.pprint(snapshot)
+			if indent==0:
+				print("creating index "+snapshot[sd["path"]])
+				Subvolumes[snapshot[sd["uuid"]]]=Subvolume(snapshot[sd["path"]])
+			else:
+				print("adding "+str(snapshot))
+				Subvolumes[snapshot[sd["parent_uuid"]]].addSnapshot(snapshot)
+#				print(" "*indent+snapshot[3]+" "+snapshot[0])
+			walk_snapshots(Subvolumes,snapshots,snapshot[sd["uuid"]],indent+1)
+
+Subvolumes=dict()
+walk_snapshots(Subvolumes,snapshots,"-",0)
+pp.pprint(Subvolumes)
+for key in Subvolumes:
+	print(Subvolumes[key])
+
+
