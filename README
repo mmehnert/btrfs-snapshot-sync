@@ -1,0 +1,6 @@
+Some python scripts to synchronize btrfs snapshots to (remote) storage (over ssh).
+
+Includes customizable numbers of snapshots to keep for
+daily/weekly/monthly or arbitrary interval snapshots.
+
+Best used in combination with my btrfs snapshot rotation scripts.
